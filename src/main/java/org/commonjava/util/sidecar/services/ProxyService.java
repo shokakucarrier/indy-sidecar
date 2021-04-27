@@ -26,6 +26,7 @@ import org.apache.commons.io.IOUtils;
 import org.commonjava.util.sidecar.config.ProxyConfiguration;
 import org.commonjava.util.sidecar.interceptor.ExceptionHandler;
 import org.commonjava.util.sidecar.interceptor.MetricsHandler;
+import org.commonjava.util.sidecar.model.TrackedContent;
 import org.commonjava.util.sidecar.util.UrlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,8 @@ public class ProxyService
 
     @Inject
     Classifier classifier;
+
+    private TrackedContent trackedContent;
 
     @PostConstruct
     void init()
