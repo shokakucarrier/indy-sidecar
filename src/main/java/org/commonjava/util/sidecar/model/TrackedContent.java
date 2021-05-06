@@ -17,7 +17,11 @@ public class TrackedContent
 
     private Set<TrackedContentEntry> downloads;
 
-    public TrackedContent(){}
+    public TrackedContent(){
+        this.key = new TrackingKey("");
+        this.uploads = new HashSet<>();
+        this.downloads = new HashSet<>();
+    }
 
     public void setKey(TrackingKey key) {
         this.key = key;
@@ -49,10 +53,19 @@ public class TrackedContent
         return uploads;
     }
 
+    public void appendUpload(TrackedContentEntry upload){
+        this.uploads.add(upload);
+    }
+
     public Set<TrackedContentEntry> getDownloads()
     {
         return downloads;
     }
+
+    public void appendDownload(TrackedContentEntry download){
+        this.downloads.add(download);
+    }
+
 
     @Override
     public boolean equals( Object o )

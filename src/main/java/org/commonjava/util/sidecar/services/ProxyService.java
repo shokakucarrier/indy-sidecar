@@ -21,12 +21,13 @@ import io.vertx.core.MultiMap;
 import io.vertx.core.VertxException;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.mutiny.core.buffer.Buffer;
+import io.vertx.mutiny.core.eventbus.EventBus;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import org.apache.commons.io.IOUtils;
 import org.commonjava.util.sidecar.config.ProxyConfiguration;
 import org.commonjava.util.sidecar.interceptor.ExceptionHandler;
 import org.commonjava.util.sidecar.interceptor.MetricsHandler;
-import org.commonjava.util.sidecar.model.TrackedContent;
+import org.commonjava.util.sidecar.model.*;
 import org.commonjava.util.sidecar.util.UrlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,10 +35,12 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import javax.ws.rs.GET;
 import javax.ws.rs.core.Response;
+import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
@@ -73,12 +76,16 @@ public class ProxyService
     @Inject
     Classifier classifier;
 
-    private TrackedContent trackedContent;
+    @Inject
+    EventBus bus;
+
+    private TrackedContent trackedContent = new TrackedContent();
 
     @PostConstruct
     void init()
     {
         timeout = readTimeout();
+        trackedContent.setKey(new TrackingKey( System.getenv().containsKey("buildContentId")?System.getenv("buildContentId"):"build-unknown"));
         logger.debug( "Init, timeout: {}", timeout );
     }
 
@@ -129,11 +136,20 @@ public class ProxyService
 
     public Uni<Response> doGet( String path, HttpServerRequest request ) throws Exception
     {
+        String[] elements = path.split("/");
+
+        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(trackedContent.getKey().getId()),
+                                                            new StoreKey(elements[2],StoreType.valueOf(elements[3]),elements[4]),
+                                                            "GENERIC_PROXY",
+                                                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path,
+                                                            path,
+                                                            (long) 0,"","","");
+
         return normalizePathAnd( path, p -> classifier.classifyAnd( p, request, ( client, service ) -> wrapAsyncCall(
-                        client.get( p )
-                                .putHeaders( getHeaders( request ) )
-                                .timeout( timeout )
-                                .send()) ), request );
+                client.get( p )
+                        .putHeaders( getHeaders( request ) )
+                        .timeout( timeout )
+                        .send() , entry ) ), request );
     }
 
     public Uni<Response> doPost( String path, InputStream is, HttpServerRequest request ) throws Exception
@@ -176,7 +192,7 @@ public class ProxyService
                         .send() ) ), request );
     }
 
-    private Uni<Response> wrapAsyncCall( Uni<HttpResponse<Buffer>> asyncCall )
+    private Uni<Response> wrapAsyncCall( Uni<HttpResponse<Buffer>> asyncCall)
     {
         ProxyConfiguration.Retry retry = proxyConfiguration.getRetry();
         Uni<Response> ret = asyncCall.onItem().transform( this::convertProxyResp );
@@ -191,6 +207,25 @@ public class ProxyService
                     .retry()
                     .withBackOff( Duration.ofMillis( backOff ) )
                     .atMost( retry.count );
+        }
+        return ret.onFailure().recoverWithItem( this::handleProxyException );
+    }
+
+    private Uni<Response> wrapAsyncCall( Uni<HttpResponse<Buffer>> asyncCall, TrackedContentEntry entry)
+    {
+        ProxyConfiguration.Retry retry = proxyConfiguration.getRetry();
+        Uni<Response> ret = asyncCall.onItem().transform( a -> this.convertProxyResp( a, entry ) );
+        if ( retry.count > 0 )
+        {
+            long backOff = retry.interval;
+            if ( retry.interval <= 0 )
+            {
+                backOff = DEFAULT_BACKOFF_MILLIS;
+            }
+            ret = ret.onFailure( t -> ( t instanceof IOException || t instanceof VertxException ) )
+                     .retry()
+                     .withBackOff( Duration.ofMillis( backOff ) )
+                     .atMost( retry.count );
         }
         return ret.onFailure().recoverWithItem( this::handleProxyException );
     }
@@ -223,6 +258,44 @@ public class ProxyService
         if ( resp.body() != null )
         {
             byte[] bytes = resp.body().getBytes();
+            builder.entity( bytes );
+        }
+        return builder.build();
+    }
+
+    private Response convertProxyResp( HttpResponse<Buffer> resp , TrackedContentEntry entry)
+    {
+        logger.debug( "Proxy resp: {} {}", resp.statusCode(), resp.statusMessage() );
+        logger.trace( "Raw resp headers:\n{}", resp.headers() );
+        Response.ResponseBuilder builder = Response.status( resp.statusCode(), resp.statusMessage() );
+        resp.headers().forEach( header -> {
+            if ( respHeaderAllowed( header ) )
+            {
+                builder.header( header.getKey(), header.getValue() );
+            }
+        } );
+        if ( resp.body() != null )
+        {
+            byte[] bytes = resp.body().getBytes();
+            entry.setSize( (long) bytes.length );
+            MessageDigest message;
+            try
+            {
+                message = MessageDigest.getInstance("MD5");
+                message.update( bytes );
+                entry.setMd5( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                message = MessageDigest.getInstance("SHA-1");
+                message.update( bytes );
+                entry.setSha1( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                message = MessageDigest.getInstance("SHA-256");
+                message.update( bytes );
+                entry.setSha256( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                trackedContent.appendDownload( entry );
+            }
+            catch ( NoSuchAlgorithmException e )
+            {
+                e.printStackTrace();
+            }
             builder.entity( bytes );
         }
         return builder.build();
