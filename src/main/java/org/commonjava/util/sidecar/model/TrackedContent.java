@@ -1,5 +1,7 @@
 package org.commonjava.util.sidecar.model;
 
+import javax.annotation.PostConstruct;
+import javax.enterprise.context.ApplicationScoped;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -7,6 +9,9 @@ import java.io.ObjectOutput;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.commonjava.util.sidecar.util.SidecarUtils.getBuildConfigId;
+
+@ApplicationScoped
 public class TrackedContent
         implements Externalizable
 {
@@ -17,10 +22,14 @@ public class TrackedContent
 
     private Set<TrackedContentEntry> downloads;
 
-    public TrackedContent(){
-        this.key = new TrackingKey("");
+    @PostConstruct
+    void init(){
+        this.key = new TrackingKey(getBuildConfigId() == null ? "unknown":getBuildConfigId() );
         this.uploads = new HashSet<>();
         this.downloads = new HashSet<>();
+    }
+
+    public TrackedContent(){
     }
 
     public void setKey(TrackingKey key) {

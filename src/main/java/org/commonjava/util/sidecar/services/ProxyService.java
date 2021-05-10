@@ -21,7 +21,6 @@ import io.vertx.core.MultiMap;
 import io.vertx.core.VertxException;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.mutiny.core.buffer.Buffer;
-import io.vertx.mutiny.core.eventbus.EventBus;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import org.apache.commons.io.IOUtils;
 import org.commonjava.util.sidecar.config.ProxyConfiguration;
@@ -54,6 +53,7 @@ import static org.commonjava.o11yphant.metrics.RequestContextConstants.EXTERNAL_
 import static org.commonjava.o11yphant.metrics.RequestContextConstants.TRACE_ID;
 import static org.commonjava.util.sidecar.services.ProxyConstants.CONTENT_REST_BASE_PATH;
 import static org.commonjava.util.sidecar.services.ProxyConstants.EVENT_PROXY_CONFIG_CHANGE;
+import static org.commonjava.util.sidecar.util.SidecarUtils.getBuildConfigId;
 
 @ApplicationScoped
 @ExceptionHandler
@@ -77,15 +77,12 @@ public class ProxyService
     Classifier classifier;
 
     @Inject
-    EventBus bus;
-
-    private TrackedContent trackedContent = new TrackedContent();
+    TrackedContent trackedContent;
 
     @PostConstruct
     void init()
     {
         timeout = readTimeout();
-        trackedContent.setKey(new TrackingKey( System.getenv().containsKey("buildContentId")?System.getenv("buildContentId"):"build-unknown"));
         logger.debug( "Init, timeout: {}", timeout );
     }
 
@@ -138,7 +135,7 @@ public class ProxyService
     {
         String[] elements = path.split("/");
 
-        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(trackedContent.getKey().getId()),
+        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(getBuildConfigId() == null ? "unknown":getBuildConfigId()),
                                                             new StoreKey(elements[2],StoreType.valueOf(elements[3]),elements[4]),
                                                             "GENERIC_PROXY",
                                                             "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path,

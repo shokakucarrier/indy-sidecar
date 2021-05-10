@@ -23,7 +23,7 @@ public final class StoreKey
 
     private String name;
 
-    private static String MAVEN_PKG_KEY = "maven";
+    private static final String MAVEN_PKG_KEY = "maven";
 
     public StoreKey(){
         packageType = "";
@@ -43,6 +43,21 @@ public final class StoreKey
     {
         this.packageType = MAVEN_PKG_KEY;
         this.type = type;
+        this.name = name;
+    }
+
+    public void setPackageType( String packageType )
+    {
+        this.packageType = packageType;
+    }
+
+    public void setType( StoreType type )
+    {
+        this.type = type;
+    }
+
+    public void setName( String name )
+    {
         this.name = name;
     }
 
