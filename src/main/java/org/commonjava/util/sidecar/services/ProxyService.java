@@ -151,7 +151,37 @@ public class ProxyService
 
     public Uni<Response> doPost( String path, InputStream is, HttpServerRequest request ) throws Exception
     {
-        Buffer buf = Buffer.buffer( IOUtils.toByteArray( is ) );
+        byte[] bytes = IOUtils.toByteArray( is );
+        Buffer buf = Buffer.buffer( bytes );
+
+        String[] elements = path.split("/");
+
+        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(getBuildConfigId() == null ? "unknown":getBuildConfigId()),
+                                                            new StoreKey(elements[2],StoreType.valueOf(elements[3]),elements[4]),
+                                                            "NATIVE",
+                                                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path,
+                                                            path,
+                                                            (long) 0,"","","");
+
+        entry.setSize( (long) bytes.length );
+        MessageDigest message;
+        try
+        {
+            message = MessageDigest.getInstance("MD5");
+            message.update( bytes );
+            entry.setMd5( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+            message = MessageDigest.getInstance("SHA-1");
+            message.update( bytes );
+            entry.setSha1( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+            message = MessageDigest.getInstance("SHA-256");
+            message.update( bytes );
+            entry.setSha256( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+            trackedContent.appendDownload( entry );
+        }
+        catch ( NoSuchAlgorithmException e )
+        {
+            e.printStackTrace();
+        }
 
         return normalizePathAnd( path, p -> classifier.classifyAnd( p, request, ( client, service ) -> wrapAsyncCall(
                         client.post( p ).putHeaders( getHeaders( request ) ).timeout( timeout ).sendBuffer( buf ) ) ),
@@ -173,7 +203,38 @@ public class ProxyService
 
     public Uni<Response> doPut( String path, InputStream is, HttpServerRequest request ) throws Exception
     {
-        Buffer buf = Buffer.buffer( IOUtils.toByteArray( is ) );
+
+        byte[] bytes = IOUtils.toByteArray( is );
+        Buffer buf = Buffer.buffer( bytes );
+
+        String[] elements = path.split("/");
+
+        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(getBuildConfigId() == null ? "unknown":getBuildConfigId()),
+                                                            new StoreKey(elements[2],StoreType.valueOf(elements[3]),elements[4]),
+                                                            "NATIVE",
+                                                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path,
+                                                            path,
+                                                            (long) 0,"","","");
+
+        entry.setSize( (long) bytes.length );
+        MessageDigest message;
+        try
+        {
+            message = MessageDigest.getInstance("MD5");
+            message.update( bytes );
+            entry.setMd5( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+            message = MessageDigest.getInstance("SHA-1");
+            message.update( bytes );
+            entry.setSha1( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+            message = MessageDigest.getInstance("SHA-256");
+            message.update( bytes );
+            entry.setSha256( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+            trackedContent.appendDownload( entry );
+        }
+        catch ( NoSuchAlgorithmException e )
+        {
+            e.printStackTrace();
+        }
 
         return normalizePathAnd( path, p -> classifier.classifyAnd( p, request, ( client, service ) -> wrapAsyncCall(
                         client.put( p ).putHeaders( getHeaders( request ) ).timeout( timeout ).sendBuffer( buf ) ) ),
