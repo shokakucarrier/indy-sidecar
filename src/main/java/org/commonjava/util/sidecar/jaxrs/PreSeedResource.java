@@ -22,6 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.commonjava.util.sidecar.config.SidecarConfig;
 import org.commonjava.util.sidecar.services.ArchiveRetrieveService;
 import org.commonjava.util.sidecar.services.ProxyService;
+import org.commonjava.util.sidecar.services.ReportService;
 import org.commonjava.util.sidecar.util.TransferStreamingOutput;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -32,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.PUT;

@@ -135,18 +135,21 @@ public class ProxyService
     {
         String[] elements = path.split("/");
 
-        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(getBuildConfigId() == null ? "unknown":getBuildConfigId()),
-                                                            new StoreKey(elements[2],StoreType.valueOf(elements[3]),elements[4]),
-                                                            "GENERIC_PROXY",
-                                                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path,
-                                                            path,
-                                                            (long) 0,"","","");
+        if ( elements[2].equals( "maven" ) && ( elements[3].equals( "hosted" ) || elements[3].equals( "group" ) || elements[3].equals( "remote" ) ) )
+        {
+            TrackedContentEntry entry = new TrackedContentEntry(
+                            new TrackingKey( getBuildConfigId() == null ? "unknown" : getBuildConfigId() ),
+                            new StoreKey( elements[2], StoreType.valueOf( elements[3] ), elements[4] ), "GENERIC_PROXY",
+                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path, path, (long) 0,
+                            "", "", "" );
 
+            return normalizePathAnd( path, p -> classifier.classifyAnd( p, request, ( client, service ) -> wrapAsyncCall(
+                            client.get( p ).putHeaders( getHeaders( request ) ).timeout( timeout ).send(), entry ) ),
+                                     request );
+        }
         return normalizePathAnd( path, p -> classifier.classifyAnd( p, request, ( client, service ) -> wrapAsyncCall(
-                client.get( p )
-                        .putHeaders( getHeaders( request ) )
-                        .timeout( timeout )
-                        .send() , entry ) ), request );
+                        client.get( p ).putHeaders( getHeaders( request ) ).timeout( timeout ).send() ) ),
+                                 request );
     }
 
     public Uni<Response> doPost( String path, InputStream is, HttpServerRequest request ) throws Exception
@@ -156,31 +159,33 @@ public class ProxyService
 
         String[] elements = path.split("/");
 
-        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(getBuildConfigId() == null ? "unknown":getBuildConfigId()),
-                                                            new StoreKey(elements[2],StoreType.valueOf(elements[3]),elements[4]),
-                                                            "NATIVE",
-                                                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path,
-                                                            path,
-                                                            (long) 0,"","","");
+        if ( elements[2].equals( "maven" ) && elements[3].equals( "hosted" ) )
+        {
+            TrackedContentEntry entry = new TrackedContentEntry(
+                            new TrackingKey( getBuildConfigId() == null ? "unknown" : getBuildConfigId() ),
+                            new StoreKey( elements[2], StoreType.valueOf( elements[3] ), elements[4] ), "NATIVE",
+                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path, path, (long) 0,
+                            "", "", "" );
 
-        entry.setSize( (long) bytes.length );
-        MessageDigest message;
-        try
-        {
-            message = MessageDigest.getInstance("MD5");
-            message.update( bytes );
-            entry.setMd5( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
-            message = MessageDigest.getInstance("SHA-1");
-            message.update( bytes );
-            entry.setSha1( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
-            message = MessageDigest.getInstance("SHA-256");
-            message.update( bytes );
-            entry.setSha256( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
-            trackedContent.appendDownload( entry );
-        }
-        catch ( NoSuchAlgorithmException e )
-        {
-            e.printStackTrace();
+            entry.setSize( (long) bytes.length );
+            MessageDigest message;
+            try
+            {
+                message = MessageDigest.getInstance( "MD5" );
+                message.update( bytes );
+                entry.setMd5( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                message = MessageDigest.getInstance( "SHA-1" );
+                message.update( bytes );
+                entry.setSha1( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                message = MessageDigest.getInstance( "SHA-256" );
+                message.update( bytes );
+                entry.setSha256( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                trackedContent.appendDownload( entry );
+            }
+            catch ( NoSuchAlgorithmException e )
+            {
+                e.printStackTrace();
+            }
         }
 
         return normalizePathAnd( path, p -> classifier.classifyAnd( p, request, ( client, service ) -> wrapAsyncCall(
@@ -209,31 +214,33 @@ public class ProxyService
 
         String[] elements = path.split("/");
 
-        TrackedContentEntry entry = new TrackedContentEntry(new TrackingKey(getBuildConfigId() == null ? "unknown":getBuildConfigId()),
-                                                            new StoreKey(elements[2],StoreType.valueOf(elements[3]),elements[4]),
-                                                            "NATIVE",
-                                                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path,
-                                                            path,
-                                                            (long) 0,"","","");
+        if ( elements[2].equals( "maven" ) && elements[3].equals( "hosted" ) )
+        {
+            TrackedContentEntry entry = new TrackedContentEntry(
+                            new TrackingKey( getBuildConfigId() == null ? "unknown" : getBuildConfigId() ),
+                            new StoreKey( elements[2], StoreType.valueOf( elements[3] ), elements[4] ), "NATIVE",
+                            "http://" + proxyConfiguration.getServices().iterator().next().host + "/" + path, path, (long) 0,
+                            "", "", "" );
 
-        entry.setSize( (long) bytes.length );
-        MessageDigest message;
-        try
-        {
-            message = MessageDigest.getInstance("MD5");
-            message.update( bytes );
-            entry.setMd5( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
-            message = MessageDigest.getInstance("SHA-1");
-            message.update( bytes );
-            entry.setSha1( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
-            message = MessageDigest.getInstance("SHA-256");
-            message.update( bytes );
-            entry.setSha256( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
-            trackedContent.appendDownload( entry );
-        }
-        catch ( NoSuchAlgorithmException e )
-        {
-            e.printStackTrace();
+            entry.setSize( (long) bytes.length );
+            MessageDigest message;
+            try
+            {
+                message = MessageDigest.getInstance( "MD5" );
+                message.update( bytes );
+                entry.setMd5( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                message = MessageDigest.getInstance( "SHA-1" );
+                message.update( bytes );
+                entry.setSha1( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                message = MessageDigest.getInstance( "SHA-256" );
+                message.update( bytes );
+                entry.setSha256( DatatypeConverter.printHexBinary( message.digest() ).toLowerCase() );
+                trackedContent.appendDownload( entry );
+            }
+            catch ( NoSuchAlgorithmException e )
+            {
+                e.printStackTrace();
+            }
         }
 
         return normalizePathAnd( path, p -> classifier.classifyAnd( p, request, ( client, service ) -> wrapAsyncCall(
@@ -272,7 +279,7 @@ public class ProxyService
     private Uni<Response> wrapAsyncCall( Uni<HttpResponse<Buffer>> asyncCall, TrackedContentEntry entry)
     {
         ProxyConfiguration.Retry retry = proxyConfiguration.getRetry();
-        Uni<Response> ret = asyncCall.onItem().transform( a -> this.convertProxyResp( a, entry ) );
+        Uni<Response> ret = asyncCall.onItem().transform( buf -> convertProxyResp( buf, entry ) );
         if ( retry.count > 0 )
         {
             long backOff = retry.interval;

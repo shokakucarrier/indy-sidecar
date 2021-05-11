@@ -15,9 +15,13 @@
  */
 package org.commonjava.util.sidecar.services;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
 import io.quarkus.vertx.ConsumeEvent;
 import com.google.gson.stream.JsonReader;
+import io.smallrye.mutiny.Uni;
+import io.vertx.ext.web.client.WebClientOptions;
+import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.ext.web.client.WebClient;
+import org.commonjava.util.sidecar.config.ProxyConfiguration;
 import org.commonjava.util.sidecar.model.StoreKey;
 import org.commonjava.util.sidecar.model.StoreType;
 import org.commonjava.util.sidecar.model.TrackedContent;
@@ -25,7 +29,10 @@ import org.commonjava.util.sidecar.model.TrackedContentEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -34,7 +41,7 @@ import java.io.IOException;
 import static org.commonjava.util.sidecar.services.ProxyConstants.ARCHIVE_DECOMPRESS_COMPLETE;
 import static org.commonjava.util.sidecar.util.SidecarUtils.getBuildConfigId;
 
-@RegisterForReflection
+@ApplicationScoped
 public class ReportService
 {
     private final Logger logger = LoggerFactory.getLogger( getClass() );
@@ -42,8 +49,40 @@ public class ReportService
     @Inject
     TrackedContent trackedContent;
 
+    @Inject
+    Vertx vertx;
+
+    @Inject
+    ProxyConfiguration proxyConfiguration;
+
+    public Uni<Response> getReport(){
+        Response.ResponseBuilder builder = Response.status( Response.Status.OK ).type( MediaType.APPLICATION_JSON_TYPE ).entity( trackedContent );
+        return Uni.createFrom().item( builder.build() );
+    }
+
+    public Uni<Response> resetReport(){
+        trackedContent = new TrackedContent();
+        Response.ResponseBuilder builder = Response.status( Response.Status.OK );
+        return Uni.createFrom().item( builder.build() );
+    }
+
+    public Uni<Response> exportReport()
+    {
+        WebClientOptions options = new WebClientOptions()
+                        .setUserAgent("Sidecar/1.1.0");
+        options.setKeepAlive(false);
+        WebClient client = WebClient.create( vertx, options );
+        return client.put( "http://" + proxyConfiguration.getServices().iterator().next().host + "/" )
+                     .putHeader( "MediaType",MediaType.APPLICATION_JSON ).sendJson( trackedContent )
+                     .onItem().transform( buf -> {
+                            Response.ResponseBuilder builder = Response.status( Response.Status.OK );
+                            builder.entity( buf.body().getBytes() );
+                            return builder.build();
+                        } );
+    }
+
     @ConsumeEvent(value = ARCHIVE_DECOMPRESS_COMPLETE)
-    public void readReport(String path) throws FileNotFoundException
+    public void loadReport( String path) throws FileNotFoundException
     {
         String filePath = path + "/" + getBuildConfigId();
         logger.info( "Loading build content history:" + filePath );
@@ -51,7 +90,7 @@ public class ReportService
         load( reader );
     }
 
-    private boolean load( BufferedReader input)
+    private void load( BufferedReader input)
     {
         JsonReader reader = new JsonReader( input);
         try (input)
@@ -82,9 +121,7 @@ public class ReportService
         {
             e.printStackTrace();
             logger.warn( "Load build content history failed" );
-            return false;
         }
-        return true;
     }
 
     public TrackedContentEntry loadTrackedContentEntry(JsonReader reader){
@@ -162,6 +199,5 @@ public class ReportService
         entry.setAccessChannel( "GENERIC_PROXY" );
         return entry;
     }
-
 
 }
